@@ -263,66 +263,6 @@ class Player(Entity):
         self.updateImage()
 
 
-        
-
-
-class Platform(Entity):
-    def __init__(self, i):
-        Entity.__init__(self, "red")
-
-
-        oh = 5
-        ow = 96
-        cropped = pygame.Surface((ow, oh), pygame.SRCALPHA, 32)
-        img = pygame.image.load("tiles.png")
-  
-        cropped.blit(img, (0, 0), (16*17, 0, 16, oh))
-        cropped.blit(img, (16, 0), (16*18, 0, 16, oh))
-        cropped.blit(img, (32, 0), (16*18, 0, 16, oh))
-        cropped.blit(img, (48, 0), (16*18, 0, 16, oh))
-        cropped.blit(img, (64, 0), (16*18, 0, 16, oh))
-        cropped.blit(img, (80, 0), (16*19, 0, 16, oh))
-
-        self._surf = cropped
-        
-        #self._surf = pygame.transform.scale(self._surf,( 2*ow*(TILE_SIZE/48), 2* oh * (TILE_SIZE/48)))
-        self._update_pos()
-       
-        self.type = PLATFORM_ENTITY
-        self.pos = 100 * i + 100, i * 135 + 50
-        self.xspeed = random.randint(1, 3)        
-        self.max_right = WIDTH * .75
-        self.min_left = WIDTH * .25
-
-
-class Ball(Entity):
-    def __init__(self):
-        Entity.__init__(self, "red")
-        self.type = BALL_ENTITY
-        self.pos = random.randint(0,WIDTH - self.width), random.randint(0,HEIGHT - self.height)
-        self.xspeed = random.randint(1, 3) 
-        if (random.randint(0,1)): self.xspeed *= -1
-        self.yspeed = random.randint(1, 3) 
-        if (random.randint(0,1)): self.yspeed *= -1
-        self.solid = True
-
-class Bullet(Entity):
-    def __init__(self, x, y, dx, dy):
-        Entity.__init__(self, "red")
-        self.angle = -90
-        self.type = BULLET_ENTITY
-        self.pos = x, y
-        self.xspeed = dx 
-        self.yspeed = dy 
-        self.solid = True
-        self._surf = pygame.transform.scale(self._surf, (5,5))
-        self._update_pos()      
-        self.lifetime = 20
-        self.edgeBehavior = EDGE_DIE
-
-
-
-
 class Tile(Entity):
     def __init__(self, x, y, type):
         Entity.__init__(self,"red")        
@@ -379,9 +319,7 @@ class World():
 
 
         # update background
-        
-
-        
+                
         # update tiles
     
         # update player
