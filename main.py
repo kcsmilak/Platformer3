@@ -22,16 +22,94 @@ def loadDocsCSV(url):
         for cell in row.split(","):
             newrow.append(int(cell.strip("\"")))
         map.append(newrow)
+    print("map loaded")
     return map
 
 # END HELPER
 
+
+
+#################################################################################
+# PYZERO CLASSES
+#
+
+
+class MyActor(pygame.sprite.Sprite):
+    def __init__(self, imageName):
+        pygame.sprite.Sprite.__init__(self)
+        self.x = 0
+        self.y = 0
+        self._surf = pygame.Surface((32, 32), pygame.SRCALPHA, 32)
+        self._update_pos()
+       
+    def _update_pos(self):
+
+        self.rect = self._surf.get_rect()
+        self.rect.center = ( self.x, self.y)
+        #self.left = self.x
+        #self.right = self.x
+        #self.top = self.y
+        #self.bottom = self.y        
+
+    def colliderect(self, obstacle):
+        collided = self.rect.colliderect(obstacle.rect)
+        if (collided): print(collided)
+        return collided
+
+    def draw(self, screen):
+        if (self._surf != 0): screen.blit(self._surf, (self.x,self.y))
+        
+class Keyboard():
+    def __init__(self):
+        self.a = False
+        self.s = False
+        self.d = False
+        self.w = False
+        self.r = False
+        self.space = False
+        self.lshift = False
+        
+    def update(self):
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_r:
+                    self.r = True
+                if event.key == pygame.K_a:
+                    self.a = True
+                if event.key == pygame.K_s:
+                    self.s = True
+                if event.key == pygame.K_d:
+                    self.d = True
+                if event.key == pygame.K_w:
+                    self.w = True
+                if event.key == pygame.K_SPACE:
+                    self.space = True
+                if event.key == pygame.K_LSHIFT:
+                    self.lshift = True     
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_r:
+                    self.r = False
+                if event.key == pygame.K_a:
+                    self.a = False
+                if event.key == pygame.K_s:
+                    self.s = False
+                if event.key == pygame.K_d:
+                    self.d = False
+                if event.key == pygame.K_w:
+                    self.w = False
+                if event.key == pygame.K_SPACE:
+                    self.space = False
+                if event.key == pygame.K_LSHIFT:
+                    self.lshift = False     
+      
 #################################################################################
 # CONSTANTS
 #
 
 
 FPS = 60 
+
+SOUND_ENABLED = False
 
 TITLE = "Platformer"
 MAP_URL="https://docs.google.com/spreadsheets/d/1jbsapypHN5FX6k8K7Zs271bY8QSzSMiLkHFi2667nsU/gviz/tq?tqx=out:csv&sheet=live"
@@ -49,11 +127,7 @@ JUMP_BOOST = 11
 BACKGROUND_ENTITY = 0
 WALL_ENTITY = 1
 PLAYER_ENTITY = -1
-PLATFORM_ENTITY = -7
-BALL_ENTITY = -8
-BULLET_ENTITY = -9
 
-SHOOT_COOLDOWN = 10
 TILE_SIZE = 16
 
 DIRECTION_RIGHT = 1
@@ -71,28 +145,13 @@ EDGE_BOUNCE = 2
 EDGE_DIE = 3
 EDGE_DESTROY = 4
 
+SPEED_NORMAL = 3
+SPEED_SLOW = 1
+SPEED_FAST = 6
 
-class MyActor(pygame.sprite.Sprite):
-    def __init__(self, imageName):
-        pygame.sprite.Sprite.__init__(self)
-        self.x = 0
-        self.y = 0
-        self._surf = 0
-        self._update_pos()
-       
-    def _update_pos(self):
-        self.left = self.x
-        self.right = self.x
-        self.top = self.y
-        self.bottom = self.y
-        #self.rect = self._surf.get_rect()
-
-    def colliderect(self, actor):
-        return False
-
-    def draw(self, screen):
-        screen.blit(self._surf, (self.x,self.y))
-        
+#################################################################################
+# GAME
+#
 
 class Entity(MyActor):
     def __init__(self, imageName):
@@ -116,7 +175,12 @@ class Entity(MyActor):
         self.lifetime = -1
         self.edgeBehavior = EDGE_BOUNCE
 
+    def update(self):
+        pass
 
+class Mob(Entity):
+    def __init__(self, imageName):
+        Entity.__init__(self, imageName)
         
     def move(self, player):
         entity = self
@@ -138,16 +202,6 @@ class Entity(MyActor):
                 self.xspeed *= -1
                 self.left = self.min_left
                 hitEdge = True
-        
-        # if hit player, do something
-        if entity.colliderect(player):
-            # if platform, push the player
-            if (PLATFORM_ENTITY == entity.type):
-                player.x += entity.xspeed
-            # if ball, hurt the player
-            elif (BALL_ENTITY == entity.type):
-                player.hit = True
-                entity.hit = True
     
         entity.y += entity.yspeed
 
@@ -182,8 +236,22 @@ class Player(Entity):
         self.run = pygame.image.load("run.png")
         self.idle = pygame.image.load("idle.png")
         self.jump = pygame.image.load("jump.png")
+        self.last_animation = pygame.time.get_ticks()
+        self.animate()
         
-    def updateImage(self):
+    def animate(self):
+
+        ANIMATION_COOLDOWN = 40
+        if pygame.time.get_ticks() - self.last_animation > ANIMATION_COOLDOWN:
+            #pass
+            #print("time to animate")
+            self.last_animation = pygame.time.get_ticks()
+            self.frame += 1
+        else:
+            #print(pygame.time.get_ticks())
+            #print("skipping animation")
+            pass
+        
         cropped = pygame.Surface((32, 32), pygame.SRCALPHA, 32)
 
         img = 0
@@ -203,7 +271,6 @@ class Player(Entity):
         if (DIRECTION_LEFT == self.direction):
             cropped = pygame.transform.flip(cropped, True, False)
         
-        self.frame += 1
         self._surf = cropped
         
         #self._surf = pygame.transform.scale(self._surf,( 48, 48))
@@ -211,85 +278,70 @@ class Player(Entity):
         
 
         
-    def move(self, obstacles):
+    def update(self, obstacles):
         entity = self
 
-        # try to move in x direction
-        entity.x += entity.xspeed
+        dx = 0
+        dy = 0
 
-        # if hit edge, bounce
-        if (entity.right > entity.max_right):
-            entity.xspeed *= -1
-            entity.right = entity.max_right
-        
-        elif (entity.left < entity.min_left):
-            entity.xspeed *= -1
-            entity.left = entity.min_left                
-        else:
-            for obstacle in obstacles:
-                if entity.colliderect(obstacle):
-                    if (obstacle.solid):
-                        entity.x -= entity.xspeed                        
-                        entity.xspeed = 0
-
-        
-        entity.y += entity.yspeed
-
-        # if hit edge, bounce
-        if (entity.bottom > entity.max_bottom):
-            entity.yspeed *= -1
-            entity.bottom = entity.max_bottom
-
-            entity.yspeed = 0
-            entity.airborn = False               
+        if (self.movement == MOVEMENT_RIGHT):
+            print("trying to move right")
+            dx += self.speed
+        if (self.movement == MOVEMENT_LEFT):
+            dx -= self.speed
             
-        elif (entity.top < entity.min_top):
-            entity.yspeed *= -1
-            entity.top = entity.min_top
+        for obstacle in obstacles:
+            if obstacle.colliderect(self):
+                print("collide x")
+                dx = 0
+                self.x = obstacle.x + obstacle.rect.height + self.rect.height
 
-        else:
-            for obstacle in obstacles:
-                if entity.colliderect(obstacle):
-                    if (obstacle.solid):
-                        entity.y -= entity.yspeed
-                        if (entity.yspeed > 0):
-                            entity.airborn = False
-                        entity.yspeed = 0
-                        entity.x += obstacle.xspeed
-                        break
-            if entity.yspeed > 0:
-                entity.airborn = True
+        for obstacle in obstacles:
+            if obstacle.colliderect(self):
+                print("collide y")
+                dy = 0
+                break
+        
+        if dy > 0:
+            entity.airborn = True
 
-        self.updateImage()
+        entity.x += dx
+        entity.y += dy
+        
+        self.animate()
 
 
 class Tile(Entity):
-    def __init__(self, x, y, type):
+    def __init__(self, x, y, type, tilemap):
         Entity.__init__(self,"red")        
         cropped = pygame.Surface((16, 16), pygame.SRCALPHA, 32)
-        img = pygame.image.load("tiles.png")
         col = type % 100
         row = type // 100
-        cropped.blit(img, (0, 0), (16*col, 16*row, 16, 16))
+        cropped.blit(tilemap, (0, 0), (16*col, 16*row, 16, 16))
         self._surf = cropped
             
         self.type = type
         
         
         #self._surf = pygame.transform.scale(self._surf, (TILE_SIZE, TILE_SIZE))
-        self._update_pos()
+        #self._update_pos()
             
         self.x = x * TILE_SIZE
         self.y = y * TILE_SIZE         
 
+   
 
 class World():
     def __init__(self):
         self.all_entities = []
-        self.player = 0
+        self.player = Player()
+        self.tilemap = pygame.image.load("tiles.png")
         self.reset()
+        self.keyboard = Keyboard()
 
+    
     def reset(self):
+        
         self.all_entities.clear()
 
         map = loadDocsCSV(MAP_URL)
@@ -298,31 +350,65 @@ class World():
             for x in range(len(map[y])):
                 tileType = map[y][x]
                 if (tileType > 0):
-                    tile = Tile(x, y, tileType)
+                    tile = Tile(x, y, tileType, self.tilemap)
                     self.all_entities.append(tile)
                 elif (PLAYER_ENTITY == tileType):
                     self.player = Player()
                     self.player.x = x * TILE_SIZE
                     self.player.y = y * TILE_SIZE
-    
-        #for i in range(0, MAX_PLATFORMS):
-        #    self.all_entities.append(Platform(i))    
-
-        #for i in range(0, MAX_BALLS):
-        #    self.all_entities.append(Ball()) 
-
-
+        
     
     def update(self):
         player = self.player
         entities = self.all_entities
 
+        # handle input
+        keyboard = self.keyboard
+        keyboard.update()
+
+        
+        if (keyboard.r):
+            self.reset()
+            return
+
+        # update which direction the player is facing, regardless of movement
+        if (keyboard.d):
+            player.direction = DIRECTION_RIGHT
+        elif (keyboard.a):
+            player.direction = DIRECTION_LEFT
+
+        # can be moving either left, or right, or stationary
+        if (keyboard.d):
+            player.movement = MOVEMENT_RIGHT
+        elif (keyboard.a):
+            player.movement = MOVEMENT_LEFT            
+        else:
+            player.movement = MOVEMENT_IDLE
+
+        #if (player.airborn):
+        #    player.movement = MOVEMENT_JUMPING
+
+        # can be sprinting, crouching, or normal
+        if (keyboard.lshift):
+            player.speed = SPEED_FAST
+        elif (keyboard.s):
+            player.speed = SPEED_SLOW
+        else:
+            player.speed = SPEED_NORMAL
+
+        if keyboard.w and not player.airborn:
+            player.yspeed -= JUMP_BOOST
+            player.airborn = True
+            #player.movement = MOVEMENT_JUMPING
+    
+        player.yspeed += GRAVITY        
 
         # update background
                 
         # update tiles
     
         # update player
+        player.update(entities)
     
         # ai mobs    
         # update mobs    
@@ -331,15 +417,13 @@ class World():
         # draw world
     
         # update player actions   
-        
-        self.handleInput()
-        
+                
         # move entities
-        for entity in entities:          
-            entity.move(player)
+        #for entity in entities:          
+        #    entity.move(player)
 
         # move player
-        player.move(entities)
+        #player.move(entities)
 
         # remove hit entities
         for entity in entities:
@@ -351,66 +435,7 @@ class World():
             player.hit = False
             print("ouch!")
 
-    def handleInput(self):
 
-        return
-        if (keyboard.r):
-            self.reset()
-            return
-
-        player = self.player
-
-
-        if (keyboard.b):
-            self.all_entities.append(Ball())    
-        
-        if (keyboard.d):
-            player.direction = DIRECTION_RIGHT
-            player.movement = MOVEMENT_RIGHT
-        elif (keyboard.a):
-            player.direction = DIRECTION_LEFT
-            player.movement = MOVEMENT_RIGHT            
-        else:
-            player.movement = MOVEMENT_IDLE
-
-        if (player.airborn):
-            player.movement = MOVEMENT_JUMPING
-            
-        player.xspeed = 0
-        dx = 0
-        if (keyboard.LSHIFT):
-            dx = 7
-        elif (keyboard.S):
-            dx = 2
-        else:
-            dx = 5
-        #player.yspeed = 0
-        if (keyboard.d):
-
-            player.xspeed += dx 
-        elif (keyboard.a):
-            player.xspeed -= dx 
-        #else:
-            #player.xspeed = 0
-            #pass
-
-        if (keyboard.space) and not player.shooting:
-            # shoot
-            player.shooting = True
-            player.shootCooldown = SHOOT_COOLDOWN
-            bullet = Bullet(player.x+(player.width//2*player.direction),player.y + player.height//2,10 * player.direction,0)
-            self.all_entities.append(bullet)
-        elif player.shootCooldown > 0: # add cooldown here
-            player.shootCooldown -= 1
-        else:
-            player.shooting = False
-    
-        if keyboard.w and not player.airborn:
-            player.yspeed -= JUMP_BOOST
-            player.airborn = True
-            player.movement = MOVEMENT_JUMPING
-    
-        player.yspeed += GRAVITY
 
     def draw(self,screen):
         # draw background
@@ -433,14 +458,16 @@ class World():
 class Game():
     def __init__(self):
         self.world = World()
-    
+
         pygame.init()
-        pygame.mixer.init()
         
-        pygame.mixer.music.load('music2.mp3')
-        pygame.mixer.music.set_volume(0.3)
-        pygame.mixer.music.play(-1, 0.0, 5000)
-        
+        if (SOUND_ENABLED):
+            pygame.mixer.init()
+            
+            pygame.mixer.music.load('music2.mp3')
+            pygame.mixer.music.set_volume(0.3)
+            pygame.mixer.music.play(-1, 0.0, 5000)
+            
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         pygame.display.set_caption('Shooter')
         
@@ -451,10 +478,6 @@ class Game():
     def draw(self):
         #pygame.display.set_mode((0, 0), pygame.FULLSCREEN)        
         self.world.draw(self.screen)
-
-
-
-
 
 
 #################################################################################
