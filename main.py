@@ -2,6 +2,8 @@
 import pygame
 import random
 
+import csv
+
 #################################################################################
 # START HELPER
 #
@@ -45,19 +47,22 @@ class MyActor(pygame.sprite.Sprite):
     def _update_pos(self):
 
         self.rect = self._surf.get_rect()
-        self.rect.center = ( self.x, self.y)
+        self.rect.topleft = (self.x, self.y)
         #self.left = self.x
         #self.right = self.x
         #self.top = self.y
         #self.bottom = self.y        
 
-    def colliderect(self, obstacle):
-        collided = self.rect.colliderect(obstacle.rect)
-        if (collided): print(collided)
-        return collided
+    #def colliderect(self, obstacle):
+    #    #print(self.rect)
+    #    #print(obstacle.rect)
+    #    collided = self.rect.colliderect(obstacle.rect)
+    #    #if (collided): print(collided)
+    #    return collided
 
     def draw(self, screen):
         if (self._surf != 0): screen.blit(self._surf, (self.x,self.y))
+        pygame.draw.rect(screen, (200,200,200), self.rect, 1)
         
 class Keyboard():
     def __init__(self):
@@ -66,12 +71,15 @@ class Keyboard():
         self.d = False
         self.w = False
         self.r = False
+        self.q = False
         self.space = False
         self.lshift = False
         
     def update(self):
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_q:
+                    self.q = True
                 if event.key == pygame.K_r:
                     self.r = True
                 if event.key == pygame.K_a:
@@ -79,6 +87,7 @@ class Keyboard():
                 if event.key == pygame.K_s:
                     self.s = True
                 if event.key == pygame.K_d:
+                    print("press d")
                     self.d = True
                 if event.key == pygame.K_w:
                     self.w = True
@@ -94,6 +103,7 @@ class Keyboard():
                 if event.key == pygame.K_s:
                     self.s = False
                 if event.key == pygame.K_d:
+                    print("lower d")
                     self.d = False
                 if event.key == pygame.K_w:
                     self.w = False
@@ -114,21 +124,23 @@ SOUND_ENABLED = False
 TITLE = "Platformer"
 MAP_URL="https://docs.google.com/spreadsheets/d/1jbsapypHN5FX6k8K7Zs271bY8QSzSMiLkHFi2667nsU/gviz/tq?tqx=out:csv&sheet=live"
 
-WIDTH = 800
-HEIGHT = 600
+ZOOM = 4
+
+WIDTH = 800 * ZOOM
+HEIGHT = 600 * ZOOM
 
 MAX_PLATFORMS = 3
 
-GRAVITY = 1
-GRAVITY_MAX = 10
-HEIGHT_MIN = -200
-JUMP_BOOST = 11
+GRAVITY = 1 * ZOOM
+GRAVITY_MAX = 10 * ZOOM
+HEIGHT_MIN = -200 * ZOOM
+JUMP_BOOST = 11 * ZOOM
 
 BACKGROUND_ENTITY = 0
 WALL_ENTITY = 1
 PLAYER_ENTITY = -1
 
-TILE_SIZE = 16
+TILE_SIZE = 16 * ZOOM
 
 DIRECTION_RIGHT = 1
 DIRECTION_LEFT = -1
@@ -145,9 +157,9 @@ EDGE_BOUNCE = 2
 EDGE_DIE = 3
 EDGE_DESTROY = 4
 
-SPEED_NORMAL = 3
-SPEED_SLOW = 1
-SPEED_FAST = 6
+SPEED_NORMAL = 5 * ZOOM
+SPEED_SLOW = 2 * ZOOM
+SPEED_FAST = 8 * ZOOM
 
 #################################################################################
 # GAME
@@ -241,7 +253,7 @@ class Player(Entity):
         
     def animate(self):
 
-        ANIMATION_COOLDOWN = 40
+        ANIMATION_COOLDOWN = 0
         if pygame.time.get_ticks() - self.last_animation > ANIMATION_COOLDOWN:
             #pass
             #print("time to animate")
@@ -273,7 +285,7 @@ class Player(Entity):
         
         self._surf = cropped
         
-        #self._surf = pygame.transform.scale(self._surf,( 48, 48))
+        self._surf = pygame.transform.scale(self._surf,( 32 * ZOOM, 32 * ZOOM))
         self._update_pos()        
         
 
@@ -281,29 +293,31 @@ class Player(Entity):
     def update(self, obstacles):
         entity = self
 
-        dx = 0
-        dy = 0
+        dx = self.xspeed
+        dy = self.yspeed
 
         if (self.movement == MOVEMENT_RIGHT):
-            print("trying to move right")
+            print("right")
             dx += self.speed
         if (self.movement == MOVEMENT_LEFT):
+            print("left")
             dx -= self.speed
             
         for obstacle in obstacles:
-            if obstacle.colliderect(self):
-                print("collide x")
+            if obstacle.rect.colliderect(self.rect.x + dx, self.rect.y, self.rect.width, self.rect.height):
+                print(f'collide x s:{self.rect} o:{obstacle.rect} dx:{dx}')
                 dx = 0
-                self.x = obstacle.x + obstacle.rect.height + self.rect.height
+                #self.x = obstacle.x + obstacle.rect.height + self.rect.height
 
         for obstacle in obstacles:
-            if obstacle.colliderect(self):
-                print("collide y")
-                dy = 0
-                break
+            if obstacle.rect.colliderect(self.rect.x, self.rect.y + dy, self.rect.width, self.rect.height):
+                dy = 0#-abs(obstacle.rect.top - self.rect.bottom)
+                print(f'collide y b:{self.rect} t:{obstacle.rect} dy:{dy}')
+                entity.yspeed = 0
+                #break
         
-        if dy > 0:
-            entity.airborn = True
+        #if dy > 0:
+        #    entity.airborn = True
 
         entity.x += dx
         entity.y += dy
@@ -318,19 +332,29 @@ class Tile(Entity):
         col = type % 100
         row = type // 100
         cropped.blit(tilemap, (0, 0), (16*col, 16*row, 16, 16))
+        cropped = pygame.transform.scale(cropped, (TILE_SIZE, TILE_SIZE))
         self._surf = cropped
             
         self.type = type
         
         
         #self._surf = pygame.transform.scale(self._surf, (TILE_SIZE, TILE_SIZE))
-        #self._update_pos()
             
-        self.x = x * TILE_SIZE
-        self.y = y * TILE_SIZE         
+        self.x = x * TILE_SIZE #+ TILE_SIZE // 2
+        self.y = y * TILE_SIZE #+ TILE_SIZE // 2         
+        self._update_pos()
 
-   
-
+        
+MAP_DATA = [[1,1,1,1,1,1,1,1,1,1],
+            [1,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,1],
+            [1,0,-1,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,0,1],           
+            [1,1,1,1,1,1,1,1,1,1]]
+            
 class World():
     def __init__(self):
         self.all_entities = []
@@ -344,8 +368,21 @@ class World():
         
         self.all_entities.clear()
 
-        map = loadDocsCSV(MAP_URL)
-               
+        map = []
+        if (False):
+            map = loadDocsCSV(MAP_URL)
+        elif (False):
+            #load in level data and create world
+            with open(f'data.csv', newline='') as csvfile:
+                reader = csv.reader(csvfile, delimiter=',')
+                for x, row in enumerate(reader):
+                    map_row = []
+                    for y, tile in enumerate(row):
+                        map_row.append(int(tile))
+                    map.append(map_row)
+        else:
+            map = MAP_DATA
+                    
         for y in range(len(map)):
             for x in range(len(map[y])):
                 tileType = map[y][x]
@@ -356,6 +393,8 @@ class World():
                     self.player = Player()
                     self.player.x = x * TILE_SIZE
                     self.player.y = y * TILE_SIZE
+                    
+
         
     
     def update(self):
@@ -366,10 +405,12 @@ class World():
         keyboard = self.keyboard
         keyboard.update()
 
+        if (keyboard.q):
+            return False
         
         if (keyboard.r):
             self.reset()
-            return
+            return True
 
         # update which direction the player is facing, regardless of movement
         if (keyboard.d):
@@ -434,6 +475,8 @@ class World():
         if (player.hit):
             player.hit = False
             print("ouch!")
+            
+        return True
 
 
 
@@ -473,13 +516,27 @@ class Game():
         
     def update(self):
         pygame.time.Clock().tick(FPS)    
-        self.world.update()
-    
+        return self.world.update()
+            
     def draw(self):
-        #pygame.display.set_mode((0, 0), pygame.FULLSCREEN)        
+        #pygame.display.set_mode((800, 600), pygame.FULLSCREEN)        
         self.world.draw(self.screen)
 
 
+#################################################################################
+# TEST
+#
+        
+        
+world_data = []
+#load in level data and create world
+with open(f'data.csv', newline='') as csvfile:
+	reader = csv.reader(csvfile, delimiter=',')
+	for x, row in enumerate(reader):
+		for y, tile in enumerate(row):
+			print( int(tile) )        
+
+            
 #################################################################################
 # BOILERPLAY PYGAME / PYZERO GAMELOOP
 #
@@ -487,7 +544,7 @@ class Game():
 game = Game()
     
 def update():
-    game.update()
+    return game.update()
 
 def draw():
     game.draw()
@@ -495,12 +552,12 @@ def draw():
 def run():
     run = True    
     while run:       
-        for event in pygame.event.get():
-            #quit game
-            if event.type == pygame.QUIT:
-                run = False
+        #for event in pygame.event.get():
+        #    #quit game
+        #    if event.type == pygame.QUIT:
+        #        run = False
 
-        update()
+        if not update(): break
         draw()
         pygame.display.update()        
 
