@@ -106,6 +106,7 @@ class Keyboard():
                     print("lower d")
                     self.d = False
                 if event.key == pygame.K_w:
+                    print("lower w")
                     self.w = False
                 if event.key == pygame.K_SPACE:
                     self.space = False
@@ -117,24 +118,24 @@ class Keyboard():
 #
 
 
-FPS = 60 
+FPS = 30 
 
 SOUND_ENABLED = False
 
 TITLE = "Platformer"
 MAP_URL="https://docs.google.com/spreadsheets/d/1jbsapypHN5FX6k8K7Zs271bY8QSzSMiLkHFi2667nsU/gviz/tq?tqx=out:csv&sheet=live"
 
-ZOOM = 4
+ZOOM = 3
 
 WIDTH = 800 * ZOOM
 HEIGHT = 600 * ZOOM
 
 MAX_PLATFORMS = 3
 
-GRAVITY = 1 * ZOOM
-GRAVITY_MAX = 10 * ZOOM
+GRAVITY = 2 * ZOOM 
+GRAVITY_MAX = 40 * ZOOM
 HEIGHT_MIN = -200 * ZOOM
-JUMP_BOOST = 11 * ZOOM
+JUMP_BOOST = 15 * ZOOM
 
 BACKGROUND_ENTITY = 0
 WALL_ENTITY = 1
@@ -147,8 +148,6 @@ DIRECTION_LEFT = -1
 
 MOVEMENT_RIGHT = 1
 MOVEMENT_LEFT = -1
-
-MOVEMENT_JUMPING = 3
 MOVEMENT_IDLE = 0
 
 EDGE_STOP = 0
@@ -157,9 +156,9 @@ EDGE_BOUNCE = 2
 EDGE_DIE = 3
 EDGE_DESTROY = 4
 
-SPEED_NORMAL = 5 * ZOOM
-SPEED_SLOW = 2 * ZOOM
-SPEED_FAST = 8 * ZOOM
+SPEED_NORMAL = 4 * ZOOM
+SPEED_SLOW = 1 * ZOOM
+SPEED_FAST = 7 * ZOOM
 
 #################################################################################
 # GAME
@@ -186,6 +185,7 @@ class Entity(MyActor):
         self.direction = DIRECTION_RIGHT
         self.lifetime = -1
         self.edgeBehavior = EDGE_BOUNCE
+        self.jumping = False
 
     def update(self):
         pass
@@ -271,11 +271,12 @@ class Player(Entity):
         if (MOVEMENT_IDLE == self.movement):
             img = self.idle
             frame = (self.frame // 1) % 11 
-        elif (MOVEMENT_JUMPING == self.movement):
+        elif (self.jumping):
             img = self.jump
             frame = 0
         else:
             img = self.run
+            
             frame = (self.frame // 1) % 12
        
         cropped.blit(img, (0, 0), (32 * (frame), 0, 32, 32))
@@ -291,36 +292,85 @@ class Player(Entity):
 
         
     def update(self, obstacles):
-        entity = self
 
-        dx = self.xspeed
+        update_round = pygame.time.get_ticks()
+        
+        dx = 0#self.xspeed
         dy = self.yspeed
 
+        dy += GRAVITY
+
+        #print(f'# update y ={self.rect.y} ys={self.yspeed} dy={dy}')
+
+        # terminal velocity check
+        if (dy > GRAVITY_MAX):
+            self.airborn = True
+            dy = GRAVITY_MAX
+
+        if (self.jumping and not self.airborn):
+            dy -= JUMP_BOOST
+            self.airborn = True
+            print("jump")
+        
         if (self.movement == MOVEMENT_RIGHT):
-            print("right")
+            print("right movement")
             dx += self.speed
         if (self.movement == MOVEMENT_LEFT):
-            print("left")
+            print("left movement")
             dx -= self.speed
             
         for obstacle in obstacles:
-            if obstacle.rect.colliderect(self.rect.x + dx, self.rect.y, self.rect.width, self.rect.height):
-                print(f'collide x s:{self.rect} o:{obstacle.rect} dx:{dx}')
-                dx = 0
+            testrect = pygame.Rect(self.rect.x + dx, self.rect.y, self.rect.width, self.rect.height)
+            if obstacle.rect.colliderect(testrect):
+                # check if colliding from the right or left
+                diff = 0
+                if (dx < 0):
+                    print("hitting right side of obstacle")
+                    diff = (obstacle.rect.x + obstacle.rect.width) - testrect.x
+                    #diff = testrect.x + self.rect.width - obstacle.rect.x
+                elif (dx > 0):
+                    print("hitting left side of obstacle")
+                    diff = (obstacle.rect.x - (testrect.x + testrect.width))
+                    #diff = testrect.x + testrect.width - obstacle.rect.x
+                else:
+                    print("x hit something standing still!")
+                print(f'collide x t:{testrect} o:{obstacle.rect} dx:{dx} diff:{diff}')
+                
+                dx += diff
+                
                 #self.x = obstacle.x + obstacle.rect.height + self.rect.height
 
+        fork = True
         for obstacle in obstacles:
-            if obstacle.rect.colliderect(self.rect.x, self.rect.y + dy, self.rect.width, self.rect.height):
-                dy = 0#-abs(obstacle.rect.top - self.rect.bottom)
-                print(f'collide y b:{self.rect} t:{obstacle.rect} dy:{dy}')
-                entity.yspeed = 0
+            testrect = pygame.Rect(self.rect.x, self.rect.y + dy, self.rect.width, self.rect.height)
+            if obstacle.rect.colliderect(testrect):
+
+                diff = 0
+                if (dy < 0): # jumping
+                    print("bump!")
+                    diff = - (testrect.y - (obstacle.rect.y + obstacle.rect.height) )                    
+                    print(f'collide y ur: {update_round} b:{self.rect} t:{obstacle.rect} dy:{dy}')
+                    fork = True
+
+                elif (dy > 0): # falling
+                    diff = (obstacle.rect.y - (testrect.y + testrect.height))
+                    self.airborn = False
+                    print("hit ground")
+                else:
+                    print("y hit something standing still dy={dy{}}")
+                
+                dy += diff#-abs(obstacle.rect.top - self.rect.bottom)
+                self.yspeed = 0
                 #break
         
         #if dy > 0:
-        #    entity.airborn = True
+        #    self.airborn = True
 
-        entity.x += dx
-        entity.y += dy
+        print(f'-- keeping gravity y={self.y - 288} ys={self.yspeed} dy={dy} --> y = {self.y + dy - 288}')
+
+        self.x += dx
+        self.y += dy
+        self.yspeed = dy
         
         self.animate()
 
@@ -348,10 +398,10 @@ class Tile(Entity):
 MAP_DATA = [[1,1,1,1,1,1,1,1,1,1],
             [1,0,0,0,0,0,0,0,0,1],
             [1,0,0,0,0,0,0,0,0,1],
-            [1,0,0,0,0,0,0,0,0,1],
-            [1,0,0,0,0,0,0,0,0,1],
             [1,0,-1,0,0,0,0,0,0,1],
+            [1,0,0,0,0,1,0,0,0,1],
             [1,0,0,0,0,0,0,0,0,1],
+            [1,0,0,0,0,0,0,0,1,1],
             [1,0,0,0,0,0,0,0,0,1],           
             [1,1,1,1,1,1,1,1,1,1]]
             
@@ -437,12 +487,12 @@ class World():
         else:
             player.speed = SPEED_NORMAL
 
-        if keyboard.w and not player.airborn:
-            player.yspeed -= JUMP_BOOST
-            player.airborn = True
-            #player.movement = MOVEMENT_JUMPING
+        if keyboard.w:
+            player.jumping = True
+        else:
+            player.jumping = False
     
-        player.yspeed += GRAVITY        
+        #player.yspeed += GRAVITY        
 
         # update background
                 
