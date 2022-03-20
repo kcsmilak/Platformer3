@@ -62,7 +62,7 @@ class MyActor(pygame.sprite.Sprite):
 
     def draw(self, screen):
         if (self._surf != 0): screen.blit(self._surf, (self.x,self.y))
-        pygame.draw.rect(screen, (200,200,200), self.rect, 1)
+        #pygame.draw.rect(screen, (200,200,200), self.rect, 1)
         
 class Keyboard():
     def __init__(self):
@@ -125,7 +125,7 @@ SOUND_ENABLED = False
 TITLE = "Platformer"
 MAP_URL="https://docs.google.com/spreadsheets/d/1jbsapypHN5FX6k8K7Zs271bY8QSzSMiLkHFi2667nsU/gviz/tq?tqx=out:csv&sheet=live"
 
-ZOOM = 3
+ZOOM = 1
 
 WIDTH = 800 * ZOOM
 HEIGHT = 600 * ZOOM
@@ -135,7 +135,7 @@ MAX_PLATFORMS = 3
 GRAVITY = 2 * ZOOM 
 GRAVITY_MAX = 40 * ZOOM
 HEIGHT_MIN = -200 * ZOOM
-JUMP_BOOST = 15 * ZOOM
+JUMP_BOOST = 20 * ZOOM
 
 BACKGROUND_ENTITY = 0
 WALL_ENTITY = 1
@@ -286,7 +286,7 @@ class Player(Entity):
         
         self._surf = cropped
         
-        self._surf = pygame.transform.scale(self._surf,( 32 * ZOOM, 32 * ZOOM))
+        self._surf = pygame.transform.scale(self._surf,( 32 * ZOOM *1, 32 * ZOOM * 1))
         self._update_pos()        
         
 
@@ -310,13 +310,13 @@ class Player(Entity):
         if (self.jumping and not self.airborn):
             dy -= JUMP_BOOST
             self.airborn = True
-            print("jump")
+            #print("jump")
         
         if (self.movement == MOVEMENT_RIGHT):
-            print("right movement")
+            #print("right movement")
             dx += self.speed
         if (self.movement == MOVEMENT_LEFT):
-            print("left movement")
+            #print("left movement")
             dx -= self.speed
             
         for obstacle in obstacles:
@@ -325,15 +325,16 @@ class Player(Entity):
                 # check if colliding from the right or left
                 diff = 0
                 if (dx < 0):
-                    print("hitting right side of obstacle")
+                    #print("hitting right side of obstacle")
                     diff = (obstacle.rect.x + obstacle.rect.width) - testrect.x
                     #diff = testrect.x + self.rect.width - obstacle.rect.x
                 elif (dx > 0):
-                    print("hitting left side of obstacle")
+                    #print("hitting left side of obstacle")
                     diff = (obstacle.rect.x - (testrect.x + testrect.width))
                     #diff = testrect.x + testrect.width - obstacle.rect.x
                 else:
-                    print("x hit something standing still!")
+                    #print("x hit something standing still!")
+                    pass
                 print(f'collide x t:{testrect} o:{obstacle.rect} dx:{dx} diff:{diff}')
                 
                 dx += diff
@@ -347,17 +348,19 @@ class Player(Entity):
 
                 diff = 0
                 if (dy < 0): # jumping
-                    print("bump!")
+                    #print("bump!")
                     diff = - (testrect.y - (obstacle.rect.y + obstacle.rect.height) )                    
-                    print(f'collide y ur: {update_round} b:{self.rect} t:{obstacle.rect} dy:{dy}')
+                    #print(f'collide y ur: {update_round} b:{self.rect} t:{obstacle.rect} dy:{dy}')
                     fork = True
 
                 elif (dy > 0): # falling
                     diff = (obstacle.rect.y - (testrect.y + testrect.height))
                     self.airborn = False
-                    print("hit ground")
+                    #print("hit ground")
                 else:
-                    print("y hit something standing still dy={dy{}}")
+                    #print("y hit something standing still dy={dy{}}")
+
+                    pass
                 
                 dy += diff#-abs(obstacle.rect.top - self.rect.bottom)
                 self.yspeed = 0
@@ -366,7 +369,7 @@ class Player(Entity):
         #if dy > 0:
         #    self.airborn = True
 
-        print(f'-- keeping gravity y={self.y - 288} ys={self.yspeed} dy={dy} --> y = {self.y + dy - 288}')
+        #print(f'-- keeping gravity y={self.y - 288} ys={self.yspeed} dy={dy} --> y = {self.y + dy - 288}')
 
         self.x += dx
         self.y += dy
@@ -419,7 +422,7 @@ class World():
         self.all_entities.clear()
 
         map = []
-        if (False):
+        if (True):
             map = loadDocsCSV(MAP_URL)
         elif (False):
             #load in level data and create world
