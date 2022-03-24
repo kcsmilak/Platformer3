@@ -1,35 +1,11 @@
 #import pgzrun
 import pygame
+pygame.init()
 import random
+import helpers
+from helpers import *
 
 import csv
-
-#################################################################################
-# START HELPER
-#
-
-import io
-try:
-    # Python2
-    from urllib2 import urlopen
-except ImportError:
-    # Python3
-    from urllib.request import urlopen
-    
-def loadDocsCSV(url):
-    map = []
-    str = io.BytesIO(urlopen(url).read()).read().decode('UTF-8')        
-    for row in str.split("\n"):
-        newrow = []
-        for cell in row.split(","):
-            newrow.append(int(cell.strip("\"")))
-        map.append(newrow)
-    print("map loaded")
-    return map
-
-# END HELPER
-
-
 
 #################################################################################
 # PYZERO CLASSES
@@ -39,20 +15,54 @@ def loadDocsCSV(url):
 class MyActor(pygame.sprite.Sprite):
     def __init__(self, imageName):
         pygame.sprite.Sprite.__init__(self)
-        self.x = 0
-        self.y = 0
+        self._x = 0
+        self._y = 0
         self._surf = pygame.Surface((32, 32), pygame.SRCALPHA, 32)
         self._update_pos()
        
     def _update_pos(self):
-
         self.rect = self._surf.get_rect()
         self.rect.topleft = (self.x, self.y)
-        #self.left = self.x
-        #self.right = self.x
-        #self.top = self.y
-        #self.bottom = self.y        
+      
 
+    @property
+    def right(self):
+        return self.rect.right
+
+    @property
+    def left(self):
+        return self.rect.left
+
+    @property
+    def top(self):
+        return self.rect.top
+
+    @property
+    def bottom(self):
+        return self.rect.bottom
+
+    @property
+    def x(self):
+        return self._x
+
+    @x.setter
+    def x(self, value):
+        self._x = value
+        self._update_pos()
+
+    @property
+    def y(self):
+        return self._y
+
+    @y.setter
+    def y(self, value):
+        self._y = value
+        self._update_pos()
+
+    @property
+    def image(self):
+        return self._surf
+        
     #def colliderect(self, obstacle):
     #    #print(self.rect)
     #    #print(obstacle.rect)
@@ -63,55 +73,7 @@ class MyActor(pygame.sprite.Sprite):
     def draw(self, screen):
         if (self._surf != 0): screen.blit(self._surf, (self.x,self.y))
         #pygame.draw.rect(screen, (200,200,200), self.rect, 1)
-        
-class Keyboard():
-    def __init__(self):
-        self.a = False
-        self.s = False
-        self.d = False
-        self.w = False
-        self.r = False
-        self.q = False
-        self.space = False
-        self.lshift = False
-        
-    def update(self):
-        for event in pygame.event.get():
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_q:
-                    self.q = True
-                if event.key == pygame.K_r:
-                    self.r = True
-                if event.key == pygame.K_a:
-                    self.a = True
-                if event.key == pygame.K_s:
-                    self.s = True
-                if event.key == pygame.K_d:
-                    print("press d")
-                    self.d = True
-                if event.key == pygame.K_w:
-                    self.w = True
-                if event.key == pygame.K_SPACE:
-                    self.space = True
-                if event.key == pygame.K_LSHIFT:
-                    self.lshift = True     
-            if event.type == pygame.KEYUP:
-                if event.key == pygame.K_r:
-                    self.r = False
-                if event.key == pygame.K_a:
-                    self.a = False
-                if event.key == pygame.K_s:
-                    self.s = False
-                if event.key == pygame.K_d:
-                    print("lower d")
-                    self.d = False
-                if event.key == pygame.K_w:
-                    print("lower w")
-                    self.w = False
-                if event.key == pygame.K_SPACE:
-                    self.space = False
-                if event.key == pygame.K_LSHIFT:
-                    self.lshift = False     
+
       
 #################################################################################
 # CONSTANTS
@@ -120,7 +82,7 @@ class Keyboard():
 
 FPS = 30 
 
-SOUND_ENABLED = False
+SOUND_ENABLED = True
 
 TITLE = "Platformer"
 MAP_URL="https://docs.google.com/spreadsheets/d/1jbsapypHN5FX6k8K7Zs271bY8QSzSMiLkHFi2667nsU/gviz/tq?tqx=out:csv&sheet=live"
@@ -143,8 +105,8 @@ PLAYER_ENTITY = -1
 
 TILE_SIZE = 16 * ZOOM
 
-DIRECTION_RIGHT = 1
-DIRECTION_LEFT = -1
+LOOKING_RIGHT = 1
+LOOKING_LEFT = -1
 
 MOVEMENT_RIGHT = 1
 MOVEMENT_LEFT = -1
@@ -155,6 +117,7 @@ EDGE_STICK = 1
 EDGE_BOUNCE = 2
 EDGE_DIE = 3
 EDGE_DESTROY = 4
+EDGE_IGNORE = 5
 
 SPEED_NORMAL = 4 * ZOOM
 SPEED_SLOW = 1 * ZOOM
@@ -180,9 +143,9 @@ class Entity(MyActor):
         self.solid = True
         self.shooting = False
         self.edgeBounce = True
-        self.shootCooldown = 0
+        self.shoot_cooldown = 0
         self.movement = MOVEMENT_IDLE
-        self.direction = DIRECTION_RIGHT
+        self.looking = LOOKING_RIGHT
         self.lifetime = -1
         self.edgeBehavior = EDGE_BOUNCE
         self.jumping = False
@@ -194,11 +157,10 @@ class Mob(Entity):
     def __init__(self, imageName):
         Entity.__init__(self, imageName)
         
-    def move(self, player):
-        entity = self
+    def move(self):
 
-        hitEdge = False
-        
+        entity = self
+       
         # try to move in x direction
         entity.x += entity.xspeed
 
@@ -207,13 +169,15 @@ class Mob(Entity):
             if (EDGE_BOUNCE == self.edgeBehavior):
                 self.xspeed *= -1
                 self.right = self.max_right
-                hitEdge = True
+            elif (EDGE_IGNORE == self.edgeBehavior):
+                pass
         
         elif (self.left < self.min_left):
             if (EDGE_BOUNCE == self.edgeBehavior):
                 self.xspeed *= -1
                 self.left = self.min_left
-                hitEdge = True
+            elif (EDGE_IGNORE == self.edgeBehavior):
+                pass
     
         entity.y += entity.yspeed
 
@@ -222,23 +186,45 @@ class Mob(Entity):
             if (EDGE_BOUNCE == self.edgeBehavior):
                 entity.yspeed *= -1
                 entity.bottom = entity.max_bottom           
-                hitEdge = True
+            elif (EDGE_IGNORE == self.edgeBehavior):
+                pass
             
         elif (entity.top < entity.min_top):
             if (EDGE_BOUNCE == self.edgeBehavior):
                 entity.yspeed *= -1
                 entity.top = entity.min_top
-                hitEdge = True
-
-        if hitEdge:
-            self.hit = True
+            elif (EDGE_IGNORE == self.edgeBehavior):
+                pass
 
         if (self.lifetime >= 0):
             self.lifetime -= 1
             if (self.lifetime <=0):
                 self.hit = True              
+
+class Bullet(Mob):
+    def __init__(self, x, y, dx):
+        Mob.__init__(self, "red.png")
+        self.x = x
+        self.y = y
+        self.xspeed = dx
+        self._surf = pygame.transform.scale(pygame.image.load("red.png"), (5,5))
+        self._update_pos()
+        self.lifetime = 30
+        self.edgeBehavior = EDGE_IGNORE
+
+    def update(self, player, obstacles, world):
+        self.move()
+
+        if pygame.sprite.spritecollide(self, obstacles, False):
+            self.hit = True
+
+        
         
 class Player(Entity):
+
+    SHOOT_COOLDOWN = 5
+    ANIMATION_COOLDOWN = 0    
+    
     def __init__(self):
         Entity.__init__(self, "red")
         self.type = PLAYER_ENTITY
@@ -253,8 +239,8 @@ class Player(Entity):
         
     def animate(self):
 
-        ANIMATION_COOLDOWN = 0
-        if pygame.time.get_ticks() - self.last_animation > ANIMATION_COOLDOWN:
+        
+        if pygame.time.get_ticks() - self.last_animation > self.ANIMATION_COOLDOWN:
             #pass
             #print("time to animate")
             self.last_animation = pygame.time.get_ticks()
@@ -268,7 +254,7 @@ class Player(Entity):
 
         img = 0
         frame = 0
-        if (MOVEMENT_IDLE == self.movement):
+        if (MOVEMENT_IDLE == self.movement and not self.jumping):
             img = self.idle
             frame = (self.frame // 1) % 11 
         elif (self.jumping):
@@ -281,7 +267,7 @@ class Player(Entity):
        
         cropped.blit(img, (0, 0), (32 * (frame), 0, 32, 32))
 
-        if (DIRECTION_LEFT == self.direction):
+        if (LOOKING_LEFT == self.looking):
             cropped = pygame.transform.flip(cropped, True, False)
         
         self._surf = cropped
@@ -291,7 +277,7 @@ class Player(Entity):
         
 
         
-    def update(self, obstacles):
+    def update(self, obstacles, world):
 
         update_round = pygame.time.get_ticks()
         
@@ -302,6 +288,15 @@ class Player(Entity):
 
         #print(f'# update y ={self.rect.y} ys={self.yspeed} dy={dy}')
 
+        self.shoot_cooldown -= 1
+        if (self.shooting and self.shoot_cooldown <= 0):
+            self.shoot_cooldown = self.SHOOT_COOLDOWN
+            # Shoot something!
+            print('shoot')
+            world.addBullet(self.x + 5, self.y + 15, 10 * self.looking, 0)
+            
+
+            
         # terminal velocity check
         if (dy > GRAVITY_MAX):
             self.airborn = True
@@ -310,7 +305,7 @@ class Player(Entity):
         if (self.jumping and not self.airborn):
             dy -= JUMP_BOOST
             self.airborn = True
-            #print("jump")
+            print("jump")
         
         if (self.movement == MOVEMENT_RIGHT):
             #print("right movement")
@@ -410,20 +405,20 @@ MAP_DATA = [[1,1,1,1,1,1,1,1,1,1],
             
 class World():
     def __init__(self):
-        self.all_entities = []
+        self.tiles = pygame.sprite.Group()
+        self.bullets = pygame.sprite.Group()
         self.player = Player()
         self.tilemap = pygame.image.load("tiles.png")
         self.reset()
-        self.keyboard = Keyboard()
 
     
     def reset(self):
         
-        self.all_entities.clear()
+        self.tiles.empty()
 
         map = []
         if (True):
-            map = loadDocsCSV(MAP_URL)
+            map = helpers.loadDocsCSV(MAP_URL)
         elif (False):
             #load in level data and create world
             with open(f'data.csv', newline='') as csvfile:
@@ -441,22 +436,85 @@ class World():
                 tileType = map[y][x]
                 if (tileType > 0):
                     tile = Tile(x, y, tileType, self.tilemap)
-                    self.all_entities.append(tile)
+                    self.tiles.add(tile)
                 elif (PLAYER_ENTITY == tileType):
                     self.player = Player()
                     self.player.x = x * TILE_SIZE
                     self.player.y = y * TILE_SIZE
                     
 
-        
+    def addBullet(self, x, y, dx, dy):
+        self.bullets.add(Bullet(x,y,dx))
+        pass
     
     def update(self):
-        player = self.player
-        entities = self.all_entities
+        # update scene (e.g.: background, lighting, tile animations)
+        self.tiles.update()
 
-        # handle input
+        # update moving entities (e.g.: platforms, bullets)
+        self.bullets.update(self.player, self.tiles, self)
+        
+        # update player (avoid tiles, callback shooting)
+        self.player.update(self.tiles, self)
+    
+        # update mobs (ai, motion, collisions)
+       
+        # update player actions
+
+        # remove hit entities
+        for entity in self.bullets:
+            if (entity.hit):
+                self.bullets.remove(entity)
+
+        # handle hit Player
+        if (self.player.hit):
+            self.player.hit = False
+            print("ouch!")
+            
+        return True
+
+
+
+    def draw(self,screen):
+        # draw background
+        screen.fill((100,100,100)) 
+
+        # draw tiles
+        self.tiles.draw(screen)
+        
+        # draw entities
+        self.bullets.draw(screen)
+
+        # draw player
+        self.player.draw(screen)
+
+        # draw hud
+
+
+
+
+class Game():
+    def __init__(self):
+        self.world = World()
+        
+        if (SOUND_ENABLED):
+            pygame.mixer.init()
+            
+            pygame.mixer.music.load('music2.mp3')
+            pygame.mixer.music.set_volume(0.3)
+            pygame.mixer.music.play(-1, 0.0, 5000)
+            
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        pygame.display.set_caption('Shooter')
+        self.keyboard = helpers.Keyboard()        
+        
+    def update(self):
+        pygame.time.Clock().tick(FPS)
+
         keyboard = self.keyboard
-        keyboard.update()
+        player = self.world.player
+        
+        # handle input
 
         if (keyboard.q):
             return False
@@ -467,14 +525,14 @@ class World():
 
         # update which direction the player is facing, regardless of movement
         if (keyboard.d):
-            player.direction = DIRECTION_RIGHT
+            player.looking = LOOKING_RIGHT
         elif (keyboard.a):
-            player.direction = DIRECTION_LEFT
+            player.looking = LOOKING_LEFT
 
         # can be moving either left, or right, or stationary
-        if (keyboard.d):
+        if (keyboard.d and not keyboard.a):
             player.movement = MOVEMENT_RIGHT
-        elif (keyboard.a):
+        elif (keyboard.a and not keyboard.d):
             player.movement = MOVEMENT_LEFT            
         else:
             player.movement = MOVEMENT_IDLE
@@ -494,100 +552,22 @@ class World():
             player.jumping = True
         else:
             player.jumping = False
-    
-        #player.yspeed += GRAVITY        
 
-        # update background
-                
-        # update tiles
-    
-        # update player
-        player.update(entities)
-    
-        # ai mobs    
-        # update mobs    
-    
-        # update world    
-        # draw world
-    
-        # update player actions   
-                
-        # move entities
-        #for entity in entities:          
-        #    entity.move(player)
-
-        # move player
-        #player.move(entities)
-
-        # remove hit entities
-        for entity in entities:
-            if (entity.hit):
-                entities.remove(entity)
-
-        # handle hit Player
-        if (player.hit):
-            player.hit = False
-            print("ouch!")
-            
+        if keyboard.space:
+            player.shooting = True
+        else:
+            player.shooting = False
+        
+        
+        self.world.update()
+        debugui.update()
         return True
-
-
-
-    def draw(self,screen):
-        # draw background
-        screen.fill((100,100,100)) 
-
-        # draw tiles
-        
-        # draw entities
-        for entity in self.all_entities:
-            entity.draw(screen)
-
-        # draw player
-        self.player.draw(screen)
-
-        # draw hud
-
-
-
-
-class Game():
-    def __init__(self):
-        self.world = World()
-
-        pygame.init()
-        
-        if (SOUND_ENABLED):
-            pygame.mixer.init()
-            
-            pygame.mixer.music.load('music2.mp3')
-            pygame.mixer.music.set_volume(0.3)
-            pygame.mixer.music.play(-1, 0.0, 5000)
-            
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        pygame.display.set_caption('Shooter')
-        
-    def update(self):
-        pygame.time.Clock().tick(FPS)    
-        return self.world.update()
             
     def draw(self):
         #pygame.display.set_mode((800, 600), pygame.FULLSCREEN)        
         self.world.draw(self.screen)
+        debugui.draw(self.screen)
 
-
-#################################################################################
-# TEST
-#
-        
-        
-world_data = []
-#load in level data and create world
-with open(f'data.csv', newline='') as csvfile:
-	reader = csv.reader(csvfile, delimiter=',')
-	for x, row in enumerate(reader):
-		for y, tile in enumerate(row):
-			print( int(tile) )        
 
             
 #################################################################################
@@ -605,10 +585,12 @@ def draw():
 def run():
     run = True    
     while run:       
-        #for event in pygame.event.get():
-        #    #quit game
-        #    if event.type == pygame.QUIT:
-        #        run = False
+        for event in pygame.event.get():
+            #quit game
+            if event.type == pygame.QUIT:
+                run = False
+            elif (event.type == pygame.KEYDOWN or event.type == pygame.KEYUP):
+                game.keyboard.handleEvent(event)            
 
         if not update(): break
         draw()
