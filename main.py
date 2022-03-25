@@ -62,6 +62,11 @@ class MyActor(pygame.sprite.Sprite):
     @property
     def image(self):
         return self._surf
+
+    @image.setter
+    def image(self, value):
+        self._surf = value
+        self._update_pos()
         
     #def colliderect(self, obstacle):
     #    #print(self.rect)
@@ -102,6 +107,7 @@ JUMP_BOOST = 20 * ZOOM
 BACKGROUND_ENTITY = 0
 WALL_ENTITY = 1
 PLAYER_ENTITY = -1
+NINJA_ENTITY = -2
 
 TILE_SIZE = 16 * ZOOM
 
@@ -212,13 +218,124 @@ class Bullet(Mob):
         self.lifetime = 30
         self.edgeBehavior = EDGE_IGNORE
 
-    def update(self, player, obstacles, world):
+    def update(self, player, obstacles, mobs, world):
         self.move()
 
         if pygame.sprite.spritecollide(self, obstacles, False):
             self.hit = True
 
+        #if pygame.sprite.spritecollide(self, player, False):
+        #    self.hit = True
         
+        for mob in pygame.sprite.spritecollide(self, mobs, False):
+            print("hit mob")
+            mob.hit = True
+            self.hit = True
+
+
+class AnnimationRibbon():
+    def __init__(self, path):
+        self.ribbon = pygame.image.load(path)
+        self.num_frames = 1
+        self.x = 0
+        self.y = 0
+        self.frame_width = self.ribbon.get_width()
+        self.frame_height = self.ribbon.get_height()
+        self.frame = 0
+
+    def chopByWidth(self, width):
+        self.num_frames = self.ribbon.get_width() // width
+        self.frame_width = width
+    
+    @property
+    def image(self):
+        cropped = pygame.Surface((32, 32), pygame.SRCALPHA)
+        cropped.blit(self.ribbon, (-(self.x + self.frame * self.frame_width),0))
+        return cropped
+
+    def nextFrame(self):
+        self.frame += 1
+        if (self.frame >= self.num_frames): self.frame = 0
+
+class Animation():
+    DOUBLE_JUMP = 6
+    FALL = 4
+    HIT = 5
+    IDLE = 1
+    JUMP = 2
+    RUN = 3
+    WALL_JUMP = 7
+
+    def __init__(self):
+        self._ribbons = {}
+        self._type = -1
+        self._frame = 0
+        pass
+
+    def addByWidth(self, type, path, frame_width):
+        ribbon = AnnimationRibbon(path)
+        ribbon.chopByWidth(frame_width)
+        self._ribbons[type] = ribbon       
+        self.type = type
+
+    @property
+    def type(self):
+        return self._type
+
+    @type.setter
+    def type(self, value):
+        self._type = value
+ 
+    def animate(self):
+        self._ribbons[self.type].nextFrame()
+    
+    @property
+    def image(self):
+        image = self._ribbons[self.type].image
+        return image
+    
+
+class Ninja(Mob):
+    def __init__(self,x,y):
+        Entity.__init__(self, "red.png")
+        self.x = x
+        self.y = y
+
+        self.animation = Animation()
+        self.animation.addByWidth(Animation.RUN, "image/ninja/Run (32x32).png", 32)
+        self.animation.addByWidth(Animation.HIT, "image/ninja/Hit (32x32).png", 32)
+        self.animation.addByWidth(Animation.IDLE, "image/ninja/Idle (32x32).png", 32)
+        self.animation.addByWidth(Animation.FALL, "image/ninja/Fall (32x32).png", 32)
+        self.animation.addByWidth(Animation.JUMP, "image/ninja/Jump (32x32).png", 32)
+        self.animation.addByWidth(Animation.WALL_JUMP, "image/ninja/Wall Jump (32x32).png", 32)
+        self.animation.addByWidth(Animation.DOUBLE_JUMP, "image/ninja/Double Jump (32x32).png", 32)
+
+        self.animation.type = Animation.IDLE
+
+
+    def move(self, player, obstacles, world):
+        if pygame.sprite.spritecollide(self, obstacles, False):
+            self.hit = True
+
+        alerted = False
+        if (abs(player.x - self.x) < 100 and abs(player.y - self.y) < 100):
+            alerted = True
+        else:
+            alterted = False
+
+        if alerted: 
+            self.animation.type = Animation.DOUBLE_JUMP 
+        else: 
+            self.animation.type = Animation.IDLE
+            
+    def animate(self):
+        self.animation.animate()
+        self.image = self.animation.image
+    
+    def update(self, player, obstacles, world):
+        self.move(player, obstacles, world)
+        self.animate()
+       
         
 class Player(Entity):
 
@@ -238,17 +355,11 @@ class Player(Entity):
         self.animate()
         
     def animate(self):
-
-        
+       
         if pygame.time.get_ticks() - self.last_animation > self.ANIMATION_COOLDOWN:
-            #pass
-            #print("time to animate")
             self.last_animation = pygame.time.get_ticks()
             self.frame += 1
-        else:
-            #print(pygame.time.get_ticks())
-            #print("skipping animation")
-            pass
+
         
         cropped = pygame.Surface((32, 32), pygame.SRCALPHA, 32)
 
@@ -278,25 +389,17 @@ class Player(Entity):
 
         
     def update(self, obstacles, world):
-
-        update_round = pygame.time.get_ticks()
         
-        dx = 0#self.xspeed
+        dx = 0
         dy = self.yspeed
 
         dy += GRAVITY
 
-        #print(f'# update y ={self.rect.y} ys={self.yspeed} dy={dy}')
-
         self.shoot_cooldown -= 1
         if (self.shooting and self.shoot_cooldown <= 0):
             self.shoot_cooldown = self.SHOOT_COOLDOWN
-            # Shoot something!
-            print('shoot')
             world.addBullet(self.x + 5, self.y + 15, 10 * self.looking, 0)
-            
-
-            
+                      
         # terminal velocity check
         if (dy > GRAVITY_MAX):
             self.airborn = True
@@ -305,7 +408,6 @@ class Player(Entity):
         if (self.jumping and not self.airborn):
             dy -= JUMP_BOOST
             self.airborn = True
-            print("jump")
         
         if (self.movement == MOVEMENT_RIGHT):
             #print("right movement")
@@ -320,51 +422,26 @@ class Player(Entity):
                 # check if colliding from the right or left
                 diff = 0
                 if (dx < 0):
-                    #print("hitting right side of obstacle")
                     diff = (obstacle.rect.x + obstacle.rect.width) - testrect.x
-                    #diff = testrect.x + self.rect.width - obstacle.rect.x
                 elif (dx > 0):
-                    #print("hitting left side of obstacle")
                     diff = (obstacle.rect.x - (testrect.x + testrect.width))
-                    #diff = testrect.x + testrect.width - obstacle.rect.x
-                else:
-                    #print("x hit something standing still!")
-                    pass
-                print(f'collide x t:{testrect} o:{obstacle.rect} dx:{dx} diff:{diff}')
                 
                 dx += diff
-                
-                #self.x = obstacle.x + obstacle.rect.height + self.rect.height
 
-        fork = True
         for obstacle in obstacles:
             testrect = pygame.Rect(self.rect.x, self.rect.y + dy, self.rect.width, self.rect.height)
             if obstacle.rect.colliderect(testrect):
 
                 diff = 0
                 if (dy < 0): # jumping
-                    #print("bump!")
                     diff = - (testrect.y - (obstacle.rect.y + obstacle.rect.height) )                    
-                    #print(f'collide y ur: {update_round} b:{self.rect} t:{obstacle.rect} dy:{dy}')
-                    fork = True
 
                 elif (dy > 0): # falling
                     diff = (obstacle.rect.y - (testrect.y + testrect.height))
                     self.airborn = False
-                    #print("hit ground")
-                else:
-                    #print("y hit something standing still dy={dy{}}")
-
-                    pass
                 
-                dy += diff#-abs(obstacle.rect.top - self.rect.bottom)
+                dy += diff
                 self.yspeed = 0
-                #break
-        
-        #if dy > 0:
-        #    self.airborn = True
-
-        #print(f'-- keeping gravity y={self.y - 288} ys={self.yspeed} dy={dy} --> y = {self.y + dy - 288}')
 
         self.x += dx
         self.y += dy
@@ -408,6 +485,7 @@ class World():
         self.tiles = pygame.sprite.Group()
         self.bullets = pygame.sprite.Group()
         self.player = Player()
+        self.mobs = pygame.sprite.Group()
         self.tilemap = pygame.image.load("tiles.png")
         self.reset()
 
@@ -436,12 +514,13 @@ class World():
                 tileType = map[y][x]
                 if (tileType > 0):
                     tile = Tile(x, y, tileType, self.tilemap)
-                    self.tiles.add(tile)
+                    self.tiles.add(tile) 
                 elif (PLAYER_ENTITY == tileType):
                     self.player = Player()
                     self.player.x = x * TILE_SIZE
                     self.player.y = y * TILE_SIZE
-                    
+                elif (NINJA_ENTITY == tileType):
+                    self.mobs.add(Ninja(x * TILE_SIZE, y * TILE_SIZE))                  
 
     def addBullet(self, x, y, dx, dy):
         self.bullets.add(Bullet(x,y,dx))
@@ -452,12 +531,13 @@ class World():
         self.tiles.update()
 
         # update moving entities (e.g.: platforms, bullets)
-        self.bullets.update(self.player, self.tiles, self)
+        self.bullets.update(self.player, self.tiles, self.mobs, self)
         
         # update player (avoid tiles, callback shooting)
         self.player.update(self.tiles, self)
     
         # update mobs (ai, motion, collisions)
+        self.mobs.update(self.player, self.tiles, self)
        
         # update player actions
 
@@ -466,6 +546,11 @@ class World():
             if (entity.hit):
                 self.bullets.remove(entity)
 
+        for entity in self.mobs:
+            if (entity.hit):
+                self.mobs.remove(entity)
+                
+                
         # handle hit Player
         if (self.player.hit):
             self.player.hit = False
@@ -484,6 +569,8 @@ class World():
         
         # draw entities
         self.bullets.draw(screen)
+
+        self.mobs.draw(screen)
 
         # draw player
         self.player.draw(screen)
