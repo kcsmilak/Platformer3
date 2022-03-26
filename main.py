@@ -487,7 +487,10 @@ class World():
         self.player = Player()
         self.mobs = pygame.sprite.Group()
         self.tilemap = pygame.image.load("tiles.png")
+        self.map_width = 0
         self.reset()
+        self.surface = pygame.Surface((WIDTH*2, HEIGHT*2))
+        self.camera = pygame.Rect(WIDTH//2 - 300/2, HEIGHT - 300, 400, 300)
 
     
     def reset(self):
@@ -508,6 +511,9 @@ class World():
                     map.append(map_row)
         else:
             map = MAP_DATA
+
+        self.map_width = len(map[0])
+        print(self.map_width)
                     
         for y in range(len(map)):
             for x in range(len(map[y])):
@@ -558,25 +564,60 @@ class World():
             
         return True
 
-
-
     def draw(self,screen):
+
+        surface = self.surface
+
+        
         # draw background
-        screen.fill((100,100,100)) 
+        surface.fill((100,100,100)) 
 
         # draw tiles
-        self.tiles.draw(screen)
+        self.tiles.draw(surface)
         
         # draw entities
-        self.bullets.draw(screen)
+        self.bullets.draw(surface)
 
-        self.mobs.draw(screen)
+        self.mobs.draw(surface)
 
         # draw player
-        self.player.draw(screen)
+        self.player.draw(surface)
 
         # draw hud
 
+        zoom = 2
+
+        debugui.data['p.x'] = self.player.x
+        debugui.data['p.y'] = self.player.y
+
+        
+        debugui.data['c.x'] = self.camera.x
+        debugui.data['c.y'] = self.camera.y
+        
+        xmargin = 100
+        if self.player.x < self.camera.x + xmargin:
+            self.camera.x = self.player.x - xmargin
+        elif self.player.x + self.player.rect.width > self.camera.x + self.camera.width - xmargin:
+            self.camera.x = self.player.x - self.camera.width + self.player.rect.width + xmargin
+
+
+        ymargin = 50
+        if self.player.y < self.camera.y + ymargin:
+            self.camera.y = self.player.y - ymargin
+        elif self.player.y + self.player.rect.height > self.camera.y + self.camera.height - ymargin:
+            self.camera.y = self.player.y - self.camera.height + self.player.rect.height + ymargin
+            
+        # adjust offset if close to edge
+        if self.camera.x < 0: self.camera.x = 0
+
+        # zoom
+        temp = pygame.Surface((WIDTH, HEIGHT))        
+        temp.blit(surface, (0, 0), ((self.camera.x,self.camera.y), (self.camera.width, self.camera.height)))
+        temp = pygame.transform.scale(temp, (zoom * temp.get_width(), zoom * temp.get_height()))
+        screen.blit(temp, (0, 0), ((0,0), (temp.get_width(),temp.get_height())))
+
+        #screen.blit(surface, (0, 0), ((0,0), (surface.get_width(),surface.get_height())))
+        
 
 
 
