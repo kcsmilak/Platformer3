@@ -302,13 +302,13 @@ class Ninja(Mob):
         self.y = y
 
         self.animation = Animation()
-        self.animation.addByWidth(Animation.RUN, "image/ninja/Run (32x32).png", 32)
-        self.animation.addByWidth(Animation.HIT, "image/ninja/Hit (32x32).png", 32)
-        self.animation.addByWidth(Animation.IDLE, "image/ninja/Idle (32x32).png", 32)
-        self.animation.addByWidth(Animation.FALL, "image/ninja/Fall (32x32).png", 32)
-        self.animation.addByWidth(Animation.JUMP, "image/ninja/Jump (32x32).png", 32)
-        self.animation.addByWidth(Animation.WALL_JUMP, "image/ninja/Wall Jump (32x32).png", 32)
-        self.animation.addByWidth(Animation.DOUBLE_JUMP, "image/ninja/Double Jump (32x32).png", 32)
+        self.animation.addByWidth(Animation.RUN, "Images/ninja/Run (32x32).png", 32)
+        self.animation.addByWidth(Animation.HIT, "Images/ninja/Hit (32x32).png", 32)
+        self.animation.addByWidth(Animation.IDLE, "Images/ninja/Idle (32x32).png", 32)
+        self.animation.addByWidth(Animation.FALL, "Images/ninja/Fall (32x32).png", 32)
+        self.animation.addByWidth(Animation.JUMP, "Images/ninja/Jump (32x32).png", 32)
+        self.animation.addByWidth(Animation.WALL_JUMP, "Images/ninja/Wall Jump (32x32).png", 32)
+        self.animation.addByWidth(Animation.DOUBLE_JUMP, "Images/ninja/Double Jump (32x32).png", 32)
 
         self.animation.type = Animation.IDLE
 
@@ -321,7 +321,7 @@ class Ninja(Mob):
         if (abs(player.x - self.x) < 100 and abs(player.y - self.y) < 100):
             alerted = True
         else:
-            alterted = False
+            alerted = False
 
         if alerted: 
             self.animation.type = Animation.DOUBLE_JUMP 
@@ -348,9 +348,15 @@ class Player(Entity):
         self.min_top = -200        
         self.x, self.y = 100, 100
         self.frame = 0
-        self.run = pygame.image.load("run.png")
-        self.idle = pygame.image.load("idle.png")
-        self.jump = pygame.image.load("jump.png")
+
+        character = "Virtual Guy"
+        path = "Images/Main Characters"
+        
+        self.run = pygame.image.load(f'{path}/{character}/Run (32x32).png')
+        self.idle = pygame.image.load(f'{path}/{character}/Idle (32x32).png')
+        self.jump = pygame.image.load(f'{path}/{character}/Jump (32x32).png')
+        
+        
         self.last_animation = pygame.time.get_ticks()
         self.animate()
         
@@ -486,7 +492,7 @@ class World():
         self.bullets = pygame.sprite.Group()
         self.player = Player()
         self.mobs = pygame.sprite.Group()
-        self.tilemap = pygame.image.load("tiles.png")
+        self.tilemap = pygame.image.load("Images/Terrain/Terrain (16x16).png")
         self.map_width = 0
         self.reset()
         self.surface = pygame.Surface((WIDTH*2, HEIGHT*2))
@@ -628,7 +634,7 @@ class Game():
         if (SOUND_ENABLED):
             pygame.mixer.init()
             
-            pygame.mixer.music.load('music2.mp3')
+            pygame.mixer.music.load('Sounds/music2.mp3')
             pygame.mixer.music.set_volume(0.3)
             pygame.mixer.music.play(-1, 0.0, 5000)
             
